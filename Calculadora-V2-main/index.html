@@ -1,0 +1,828 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Calculadora Financeira</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+
+  <style>
+    :root {
+      --bg:      #080808;
+      --surface: #0f0f0f;
+      --card:    #141414;
+      --border:  rgba(255,255,255,0.07);
+      --muted:   #666;
+      --soft:    #999;
+      --text:    #e8e8e8;
+      --white:   #ffffff;
+      --radius:  10px;
+
+      --c-basic:  #f87171;
+      --c-price:  #34d399;
+      --c-sac:    #fbbf24;
+      --c-cambio: #818cf8;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Syne', sans-serif;
+    }
+
+    body { display: flex; justify-content: center; padding: 32px 16px; }
+
+    .app { width: 100%; max-width: 1120px; }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: baseline;
+      gap: 14px;
+      margin-bottom: 28px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--border);
+    }
+    header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; color: var(--white); }
+    header span { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); letter-spacing: .08em; }
+
+    /* ── Layout ── */
+    .layout { display: grid; grid-template-columns: 220px 1fr; gap: 16px; }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      height: fit-content;
+      position: sticky;
+      top: 32px;
+    }
+    .sidebar-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: .12em;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      padding-left: 4px;
+    }
+    .nav { display: flex; flex-direction: column; gap: 4px; }
+    .nav button {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--soft);
+      padding: 9px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      width: 100%;
+      text-align: left;
+      font-family: 'Syne', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      transition: all .15s;
+    }
+    .nav button:hover { color: var(--text); background: rgba(255,255,255,.04); }
+    .nav button.active { color: var(--white); background: rgba(255,255,255,.06); border-color: var(--border); }
+    .nav button .dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .nav button[data-target="basic"]  .dot { background: var(--c-basic);  }
+    .nav button[data-target="price"]  .dot { background: var(--c-price);  }
+    .nav button[data-target="sac"]    .dot { background: var(--c-sac);    }
+    .nav button[data-target="cambio"] .dot { background: var(--c-cambio); }
+
+    /* ── Main panel ── */
+    .main {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      min-height: 480px;
+    }
+
+    .tool { display: none; animation: fadeIn .2s ease; }
+    .tool.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+    .tool-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 22px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .tool-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+    .tool-header h2 { font-size: 17px; font-weight: 700; color: var(--white); }
+    .tool-header p  { font-size: 12px; color: var(--muted); margin-top: 1px; }
+
+    /* ── Form ── */
+    .fields { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+    .field label {
+      display: block;
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: .08em;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .field input, .field select {
+      width: 100%;
+      padding: 9px 11px;
+      border-radius: 7px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      outline: none;
+      transition: border-color .15s;
+    }
+    .field input:focus, .field select:focus { border-color: rgba(255,255,255,.2); }
+    .field select option { background: #1a1a1a; }
+
+    .actions { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+    .btn-calc {
+      padding: 9px 20px;
+      border-radius: 7px;
+      border: none;
+      background: var(--white);
+      color: #000;
+      font-family: 'Syne', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity .15s, transform .1s;
+    }
+    .btn-calc:hover  { opacity: .88; }
+    .btn-calc:active { transform: scale(.98); }
+
+    .info-pill {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 5px 12px;
+    }
+    .err { color: #f87171; font-size: 12px; font-family: 'DM Mono', monospace; }
+
+    /* ── Chart ── */
+    .chart-wrap {
+      position: relative;
+      width: 100%;
+      height: 200px;
+      margin-bottom: 20px;
+    }
+
+    /* ── Table ── */
+    .table-wrap {
+      overflow: auto;
+      max-height: 260px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; font-family: 'DM Mono', monospace; }
+    thead th {
+      position: sticky;
+      top: 0;
+      background: var(--card);
+      padding: 8px 12px;
+      text-align: right;
+      color: var(--muted);
+      font-weight: 500;
+      letter-spacing: .04em;
+      border-bottom: 1px solid var(--border);
+    }
+    thead th:first-child { text-align: center; }
+    tbody td { padding: 6px 12px; text-align: right; border-bottom: 1px solid var(--border); color: var(--text); }
+    tbody td:first-child { text-align: center; color: var(--muted); }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover td { background: rgba(255,255,255,.02); }
+
+    /* ── Básico ── */
+    .basic-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+    .basic-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+    .basic-card .bc-label { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; margin-bottom: 6px; }
+    .basic-card .bc-val  { font-size: 22px; font-weight: 700; color: var(--white); }
+
+    /* ── Câmbio ── */
+    .rate-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+    .rate-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+    .rate-card .rc-pair { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; margin-bottom: 6px; }
+    .rate-card .rc-rate { font-size: 20px; font-weight: 700; color: var(--white); }
+    .rate-card .rc-sub  { font-size: 11px; color: var(--muted); margin-top: 3px; font-family: 'DM Mono', monospace; }
+    .rate-card.usd { border-top: 2px solid #60a5fa; }
+    .rate-card.eur { border-top: 2px solid var(--c-cambio); }
+
+    .conv-result {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 16px 0;
+    }
+    .conv-box {
+      flex: 1;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
+    }
+    .conv-box .cb-label { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; margin-bottom: 5px; }
+    .conv-box .cb-val   { font-size: 18px; font-weight: 700; color: var(--white); }
+    .conv-arrow { color: var(--muted); font-size: 18px; flex-shrink: 0; }
+
+    .status-dot {
+      display: inline-block;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--muted);
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    .status-dot.live { background: #34d399; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+    @media (max-width: 820px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { position: static; }
+      .nav { flex-direction: row; flex-wrap: wrap; }
+      .fields { grid-template-columns: 1fr 1fr; }
+      .rate-cards { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 520px) {
+      .fields { grid-template-columns: 1fr; }
+      .basic-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+
+<body>
+<div class="app">
+  <header>
+    <h1>Calculadora Financeira</h1>
+    <span>v2.0</span>
+  </header>
+
+  <div class="layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-label">Módulos</div>
+      <nav class="nav">
+        <button class="active" data-target="basic">
+          <span class="dot"></span>Básico
+        </button>
+        <button data-target="price">
+          <span class="dot"></span>Tabela Price
+        </button>
+        <button data-target="sac">
+          <span class="dot"></span>SAC
+        </button>
+        <button data-target="cambio">
+          <span class="dot"></span>Câmbio
+        </button>
+      </nav>
+    </aside>
+
+    <!-- Main -->
+    <main class="main">
+
+      <!-- ── Básico ── -->
+      <section id="basic" class="tool active">
+        <div class="tool-header">
+          <span class="tool-dot" style="background:var(--c-basic)"></span>
+          <div>
+            <h2>Operações Básicas</h2>
+            <p>Soma, subtração, multiplicação e divisão</p>
+          </div>
+        </div>
+
+        <div class="fields" style="grid-template-columns:1fr 1fr;">
+          <div class="field">
+            <label>Número A</label>
+            <input id="b1" type="number" placeholder="0">
+          </div>
+          <div class="field">
+            <label>Número B</label>
+            <input id="b2" type="number" placeholder="0">
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn-calc" onclick="calcBasic()">Calcular</button>
+          <span id="basic-err" class="err"></span>
+        </div>
+
+        <div class="basic-grid" id="basic-res" style="display:none">
+          <div class="basic-card">
+            <div class="bc-label">Soma</div>
+            <div class="bc-val" id="b-soma">—</div>
+          </div>
+          <div class="basic-card">
+            <div class="bc-label">Subtração</div>
+            <div class="bc-val" id="b-sub">—</div>
+          </div>
+          <div class="basic-card">
+            <div class="bc-label">Multiplicação</div>
+            <div class="bc-val" id="b-mult">—</div>
+          </div>
+          <div class="basic-card">
+            <div class="bc-label">Divisão</div>
+            <div class="bc-val" id="b-div">—</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Price ── -->
+      <section id="price" class="tool">
+        <div class="tool-header">
+          <span class="tool-dot" style="background:var(--c-price)"></span>
+          <div>
+            <h2>Tabela Price</h2>
+            <p>Parcelas fixas com amortização crescente</p>
+          </div>
+        </div>
+
+        <div class="fields">
+          <div class="field">
+            <label>Capital (R$)</label>
+            <input id="p-cap" type="number" placeholder="100000">
+          </div>
+          <div class="field">
+            <label>Taxa mensal (%)</label>
+            <input id="p-taxa" type="number" placeholder="1.5" step="0.01">
+          </div>
+          <div class="field">
+            <label>Parcelas</label>
+            <input id="p-n" type="number" placeholder="24">
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn-calc" onclick="calcPrice()">Calcular</button>
+          <span id="p-info" class="info-pill" style="display:none"></span>
+          <span id="p-err" class="err"></span>
+        </div>
+
+        <div class="chart-wrap" id="p-chart-wrap" style="display:none">
+          <canvas id="p-chart" role="img" aria-label="Evolução do saldo devedor — Tabela Price">Gráfico de saldo.</canvas>
+        </div>
+        <div class="table-wrap" id="p-table-wrap" style="display:none">
+          <table id="p-table"></table>
+        </div>
+      </section>
+
+      <!-- ── SAC ── -->
+      <section id="sac" class="tool">
+        <div class="tool-header">
+          <span class="tool-dot" style="background:var(--c-sac)"></span>
+          <div>
+            <h2>Sistema SAC</h2>
+            <p>Amortização constante com prestações decrescentes</p>
+          </div>
+        </div>
+
+        <div class="fields">
+          <div class="field">
+            <label>Capital (R$)</label>
+            <input id="s-cap" type="number" placeholder="100000">
+          </div>
+          <div class="field">
+            <label>Taxa mensal (%)</label>
+            <input id="s-taxa" type="number" placeholder="1.5" step="0.01">
+          </div>
+          <div class="field">
+            <label>Períodos</label>
+            <input id="s-n" type="number" placeholder="24">
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn-calc" onclick="calcSAC()">Calcular</button>
+          <span id="s-info" class="info-pill" style="display:none"></span>
+          <span id="s-err" class="err"></span>
+        </div>
+
+        <div class="chart-wrap" id="s-chart-wrap" style="display:none">
+          <canvas id="s-chart" role="img" aria-label="Evolução do saldo devedor — SAC">Gráfico de saldo.</canvas>
+        </div>
+        <div class="table-wrap" id="s-table-wrap" style="display:none">
+          <table id="s-table"></table>
+        </div>
+      </section>
+
+      <!-- ── Câmbio ── -->
+      <section id="cambio" class="tool">
+        <div class="tool-header">
+          <span class="tool-dot" style="background:var(--c-cambio)"></span>
+          <div>
+            <h2>Câmbio</h2>
+            <p>
+              <span class="status-dot" id="cambio-status-dot"></span>
+              <span id="cambio-status-text">Aguardando cotações…</span>
+            </p>
+          </div>
+        </div>
+
+        <div class="rate-cards">
+          <div class="rate-card usd">
+            <div class="rc-pair">USD → BRL</div>
+            <div class="rc-rate" id="rate-usd">—</div>
+            <div class="rc-sub" id="rate-usd-sub">carregando…</div>
+          </div>
+          <div class="rate-card eur">
+            <div class="rc-pair">EUR → BRL</div>
+            <div class="rc-rate" id="rate-eur">—</div>
+            <div class="rc-sub" id="rate-eur-sub">carregando…</div>
+          </div>
+        </div>
+
+        <div class="fields">
+          <div class="field">
+            <label>Valor</label>
+            <input id="c-valor" type="number" placeholder="1000" min="0">
+          </div>
+          <div class="field">
+            <label>De</label>
+            <select id="c-de">
+              <option value="usd">Dólar (USD)</option>
+              <option value="eur">Euro (EUR)</option>
+              <option value="brl">Real (BRL)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Para</label>
+            <select id="c-para">
+              <option value="brl">Real (BRL)</option>
+              <option value="usd">Dólar (USD)</option>
+              <option value="eur">Euro (EUR)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn-calc" onclick="converter()">Converter</button>
+          <button class="btn-calc" style="background:var(--card);color:var(--soft);border:1px solid var(--border);" onclick="fetchRates()">↻ Atualizar</button>
+          <span id="c-err" class="err"></span>
+        </div>
+
+        <div class="conv-result" id="c-result" style="display:none">
+          <div class="conv-box">
+            <div class="cb-label" id="c-de-label">Valor</div>
+            <div class="cb-val"   id="c-de-val">—</div>
+          </div>
+          <div class="conv-arrow">→</div>
+          <div class="conv-box">
+            <div class="cb-label" id="c-para-label">Convertido</div>
+            <div class="cb-val"   id="c-para-val">—</div>
+          </div>
+        </div>
+
+        <div class="chart-wrap" id="c-chart-wrap" style="display:none">
+          <canvas id="c-chart" role="img" aria-label="Comparação de valores entre moedas">Comparação de valores.</canvas>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+// NAVEGAÇÃO
+// ─────────────────────────────────────────────
+const navBtns = document.querySelectorAll('.nav button');
+navBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    navBtns.forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tool').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.target).classList.add('active');
+    if (btn.dataset.target === 'cambio' && !window.ratesLoaded) fetchRates();
+  });
+});
+
+// ─────────────────────────────────────────────
+// UTILITÁRIOS
+// ─────────────────────────────────────────────
+const charts = {};
+
+function destroyChart(id) {
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+
+function fmtBRL(v) {
+  return 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function fmtCur(v, cur) {
+  const syms = { brl: 'R$ ', usd: 'US$ ', eur: '€ ' };
+  return (syms[cur] || '') + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function validate(fields, errId) {
+  document.getElementById(errId).textContent = '';
+  for (const [val, label] of fields) {
+    if (isNaN(val) || val === null) {
+      document.getElementById(errId).textContent = `⚠ Campo "${label}" inválido.`;
+      return false;
+    }
+    if (val <= 0) {
+      document.getElementById(errId).textContent = `⚠ "${label}" deve ser maior que zero.`;
+      return false;
+    }
+  }
+  return true;
+}
+
+function makeLineChart(canvasId, labels, data, label, color) {
+  destroyChart(canvasId);
+  charts[canvasId] = new Chart(document.getElementById(canvasId), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label,
+        data,
+        borderColor: color,
+        backgroundColor: color + '18',
+        borderWidth: 1.5,
+        pointRadius: 0,
+        fill: true,
+        tension: 0.35
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: {
+          ticks: { color: '#555', maxTicksLimit: 10, font: { family: 'DM Mono', size: 10 } },
+          grid: { color: 'rgba(255,255,255,.04)' }
+        },
+        y: {
+          ticks: {
+            color: '#555',
+            font: { family: 'DM Mono', size: 10 },
+            callback: v => 'R$' + (v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v.toFixed(0))
+          },
+          grid: { color: 'rgba(255,255,255,.04)' }
+        }
+      }
+    }
+  });
+}
+
+function buildTableHTML(rows, cols) {
+  let html = '<thead><tr>' + cols.map(c => `<th>${c.label}</th>`).join('') + '</tr></thead><tbody>';
+  rows.forEach(r => {
+    html += '<tr>' + cols.map(c => `<td>${c.fmt ? c.fmt(r[c.key]) : r[c.key]}</td>`).join('') + '</tr>';
+  });
+  return html + '</tbody>';
+}
+
+// ─────────────────────────────────────────────
+// BÁSICO
+// ─────────────────────────────────────────────
+function calcBasic() {
+  const a = parseFloat(document.getElementById('b1').value);
+  const b = parseFloat(document.getElementById('b2').value);
+  const errEl = document.getElementById('basic-err');
+  errEl.textContent = '';
+
+  if (isNaN(a) || isNaN(b)) {
+    errEl.textContent = '⚠ Preencha ambos os campos.';
+    return;
+  }
+
+  document.getElementById('b-soma').textContent  = (a + b).toLocaleString('pt-BR');
+  document.getElementById('b-sub').textContent   = (a - b).toLocaleString('pt-BR');
+  document.getElementById('b-mult').textContent  = (a * b).toLocaleString('pt-BR');
+  document.getElementById('b-div').textContent   = b !== 0 ? (a / b).toLocaleString('pt-BR', { maximumFractionDigits: 6 }) : 'Divisão por zero';
+
+  document.getElementById('basic-res').style.display = 'grid';
+}
+
+// ─────────────────────────────────────────────
+// PRICE
+// ─────────────────────────────────────────────
+function calcPrice() {
+  const cap  = parseFloat(document.getElementById('p-cap').value);
+  const taxa = parseFloat(document.getElementById('p-taxa').value) / 100;
+  const n    = parseInt(document.getElementById('p-n').value);
+
+  if (!validate([[cap,'Capital'],[taxa*100,'Taxa'],[n,'Parcelas']], 'p-err')) return;
+
+  const fator = Math.pow(1 + taxa, n);
+  const pmt   = cap * (taxa * fator) / (fator - 1);
+  let saldo   = cap;
+
+  const rows = [], labels = [], values = [];
+
+  for (let i = 1; i <= n; i++) {
+    const juros = saldo * taxa;
+    const amort = pmt - juros;
+    saldo = Math.max(0, saldo - amort);
+    rows.push({ p: i, pmt, juros, amort, saldo });
+    labels.push(i);
+    values.push(parseFloat(saldo.toFixed(2)));
+  }
+
+  const totalJuros = rows.reduce((s, r) => s + r.juros, 0);
+  const infoEl = document.getElementById('p-info');
+  infoEl.textContent = `Prestação fixa: ${fmtBRL(pmt)} · Total juros: ${fmtBRL(totalJuros)}`;
+  infoEl.style.display = 'inline-block';
+
+  document.getElementById('p-table').innerHTML = buildTableHTML(rows, [
+    { key: 'p',     label: '#' },
+    { key: 'pmt',   label: 'Prestação', fmt: fmtBRL },
+    { key: 'juros', label: 'Juros',     fmt: fmtBRL },
+    { key: 'amort', label: 'Amort.',    fmt: fmtBRL },
+    { key: 'saldo', label: 'Saldo',     fmt: fmtBRL }
+  ]);
+
+  document.getElementById('p-chart-wrap').style.display = 'block';
+  document.getElementById('p-table-wrap').style.display = 'block';
+  makeLineChart('p-chart', labels, values, 'Saldo Price', '#34d399');
+}
+
+// ─────────────────────────────────────────────
+// SAC
+// ─────────────────────────────────────────────
+function calcSAC() {
+  const cap  = parseFloat(document.getElementById('s-cap').value);
+  const taxa = parseFloat(document.getElementById('s-taxa').value) / 100;
+  const n    = parseInt(document.getElementById('s-n').value);
+
+  if (!validate([[cap,'Capital'],[taxa*100,'Taxa'],[n,'Períodos']], 's-err')) return;
+
+  const amort = cap / n;
+  let saldo   = cap;
+
+  const rows = [], labels = [], values = [];
+
+  for (let i = 1; i <= n; i++) {
+    const juros = saldo * taxa;
+    const pmt   = amort + juros;
+    saldo = Math.max(0, saldo - amort);
+    rows.push({ p: i, pmt, juros, amort, saldo });
+    labels.push(i);
+    values.push(parseFloat(saldo.toFixed(2)));
+  }
+
+  const totalJuros = rows.reduce((s, r) => s + r.juros, 0);
+  const infoEl = document.getElementById('s-info');
+  infoEl.textContent = `Amort. fixa: ${fmtBRL(amort)} · Total juros: ${fmtBRL(totalJuros)}`;
+  infoEl.style.display = 'inline-block';
+
+  document.getElementById('s-table').innerHTML = buildTableHTML(rows, [
+    { key: 'p',     label: '#' },
+    { key: 'pmt',   label: 'Prestação', fmt: fmtBRL },
+    { key: 'juros', label: 'Juros',     fmt: fmtBRL },
+    { key: 'amort', label: 'Amort.',    fmt: fmtBRL },
+    { key: 'saldo', label: 'Saldo',     fmt: fmtBRL }
+  ]);
+
+  document.getElementById('s-chart-wrap').style.display = 'block';
+  document.getElementById('s-table-wrap').style.display = 'block';
+  makeLineChart('s-chart', labels, values, 'Saldo SAC', '#fbbf24');
+}
+
+// ─────────────────────────────────────────────
+// CÂMBIO
+// ─────────────────────────────────────────────
+const rates = { usd: null, eur: null };
+window.ratesLoaded = false;
+
+const curNames = { brl: 'Real (BRL)', usd: 'Dólar (USD)', eur: 'Euro (EUR)' };
+
+function setRateUI(cur, value) {
+  const el = document.getElementById('rate-' + cur);
+  const sub = document.getElementById('rate-' + cur + '-sub');
+  el.textContent = 'R$ ' + value.toLocaleString('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+  sub.textContent = 'Cotação de compra (bid) — ao vivo';
+}
+
+async function fetchRates() {
+  const dotEl  = document.getElementById('cambio-status-dot');
+  const textEl = document.getElementById('cambio-status-text');
+  textEl.textContent = 'Consultando API…';
+  dotEl.className = 'status-dot';
+
+  try {
+    const res  = await fetch('https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+
+    rates.usd = parseFloat(data.USDBRL.bid);
+    rates.eur = parseFloat(data.EURBRL.bid);
+
+    setRateUI('usd', rates.usd);
+    setRateUI('eur', rates.eur);
+
+    dotEl.className   = 'status-dot live';
+    textEl.textContent = 'Cotações atualizadas';
+    window.ratesLoaded = true;
+
+  } catch (e) {
+    dotEl.className   = 'status-dot';
+    textEl.textContent = 'Erro ao carregar cotações — verifique sua conexão';
+    document.getElementById('c-err').textContent = 'Não foi possível obter as cotações.';
+  }
+}
+
+function getRate(de, para) {
+  if (de === para)            return 1;
+  if (de === 'usd' && para === 'brl') return rates.usd;
+  if (de === 'brl' && para === 'usd') return 1 / rates.usd;
+  if (de === 'eur' && para === 'brl') return rates.eur;
+  if (de === 'brl' && para === 'eur') return 1 / rates.eur;
+  if (de === 'usd' && para === 'eur') return rates.usd / rates.eur;
+  if (de === 'eur' && para === 'usd') return rates.eur / rates.usd;
+  return null;
+}
+
+function converter() {
+  const errEl = document.getElementById('c-err');
+  errEl.textContent = '';
+
+  if (!rates.usd || !rates.eur) {
+    errEl.textContent = '⚠ Cotações ainda não carregadas. Clique em "↻ Atualizar".';
+    fetchRates();
+    return;
+  }
+
+  const valor = parseFloat(document.getElementById('c-valor').value);
+  const de    = document.getElementById('c-de').value;
+  const para  = document.getElementById('c-para').value;
+
+  if (isNaN(valor) || valor < 0) {
+    errEl.textContent = '⚠ Informe um valor válido.';
+    return;
+  }
+
+  const taxa       = getRate(de, para);
+  const convertido = valor * taxa;
+
+  document.getElementById('c-de-label').textContent   = curNames[de];
+  document.getElementById('c-de-val').textContent     = fmtCur(valor, de);
+  document.getElementById('c-para-label').textContent = curNames[para];
+  document.getElementById('c-para-val').textContent   = fmtCur(convertido, para);
+  document.getElementById('c-result').style.display   = 'flex';
+
+  // Gráfico de barras comparativo
+  destroyChart('c-chart');
+  const barColors = { brl: '#34d399', usd: '#60a5fa', eur: '#818cf8' };
+  charts['c-chart'] = new Chart(document.getElementById('c-chart'), {
+    type: 'bar',
+    data: {
+      labels: [curNames[de], curNames[para]],
+      datasets: [{
+        data: [valor, convertido],
+        backgroundColor: [barColors[de] + 'cc', barColors[para] + 'cc'],
+        borderColor:     [barColors[de],         barColors[para]],
+        borderWidth: 1,
+        borderRadius: 6,
+        barThickness: 60
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#555', font: { family: 'DM Mono', size: 11 } }, grid: { display: false } },
+        y: { ticks: { color: '#555', font: { family: 'DM Mono', size: 10 } }, grid: { color: 'rgba(255,255,255,.04)' } }
+      }
+    }
+  });
+  document.getElementById('c-chart-wrap').style.display = 'block';
+}
+</script>
+</body>
+</html>
